@@ -49,7 +49,7 @@ class MLP:
         for i in range(len(self.weight)):
             self.weight[i] += self.learning_rate * self.delta[i].transpose() * self.output_tmp[i]
 
-    def evaluation(self):
+    def predict(self):
         """get sigma e(n)^2 in output layer"""
         # TODO: finish
         pass
@@ -108,10 +108,3 @@ def split_feature_and_label(features_and_label):
     """[1, 2, 3,] -> [1, 2] , [3]"""
     # TODO: check input shape
     return features_and_label[:-1], features_and_label[-1:].reshape(1, 1)
-
-
-if __name__ == '__main__':
-    neuron = [(4, 3), (0, 0)]
-    tmp = set_weight(neuron)
-    array = np.array([1, 2, 3])
-    print(tmp)

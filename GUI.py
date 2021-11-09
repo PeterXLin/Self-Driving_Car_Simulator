@@ -7,6 +7,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import Car_and_Map
 import time
+import Model
+import numpy as np
 # import matplotlib.pyplot as plt
 # import matplotlib.animation as animation
 # import numpy as np
@@ -27,19 +29,19 @@ def load_map():
     car_plot = car_figure.add_subplot(111)
     # TODO: read map
     my_map = Car_and_Map.Map('./data/軌道座標點.txt')
-    car_descriptor = my_map.draw_map_and_car_start(car_plot)
+    car_descriptor, head_descriptor = my_map.draw_map_and_car_start(car_plot)
     car_canvas.draw()
-    return my_map, car_plot, car_descriptor
+    return my_map, car_plot, car_descriptor, head_descriptor
 
 
 def load_record():
     """load log and plot in figure"""
     # TODO: finish this function
-    my_map, car_plot, car_descriptor = load_map()
+    my_map, car_plot, car_descriptor, head_descriptor = load_map()
     my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
     for i in range(10):
         my_car.move(0)
-        my_car.draw_car(car_descriptor)
+        my_car.draw_car(car_descriptor, head_descriptor)
         sensor_value = my_car.sensor(my_map.border_linear_equations)
         update_sensor_output(sensor_value)
         car_canvas.draw()
@@ -48,15 +50,17 @@ def load_record():
 
 def self_drive():
     """self drive based on the pre train MLP model"""
-    my_map, car_plot, car_descriptor = load_map()
+    my_map, car_plot, car_descriptor, head_descriptor = load_map()
     my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
+    sensor_value = my_car.sensor(my_map.border_linear_equations)
+    update_sensor_output(sensor_value)
     # load model
-
+    my_model = Model.load_model()
+    tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
     while True:
-        # TODO:
-        turn_degree = 'decide steering wheel degree by model'
+        turn_degree = my_model.predict(tmp_input)[0][1]
         my_car.move(turn_degree)
-        my_car.draw_car(car_descriptor)
+        my_car.draw_car(car_descriptor, head_descriptor)
 
         if my_car.detect_collision(my_map.border_linear_equations):
             # report collision and reset car position
@@ -67,6 +71,7 @@ def self_drive():
             break
 
         sensor_value = my_car.sensor(my_map.border_linear_equations)
+        tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
         update_sensor_output(sensor_value)
         car_canvas.draw()
 

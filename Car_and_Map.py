@@ -1,6 +1,7 @@
 import numpy as np
 from math import pi
 from numpy import cos, sin, arcsin
+import random
 
 
 class Map:
@@ -45,8 +46,8 @@ class Map:
         subplot.plot((c, a), (d, d), color='red')
         subplot.plot((a, a), (d, b), color='red')
 
-        car_descriptor = draw_circle(subplot, self.car_init_position, 3, self.car_init_degree)
-        return car_descriptor
+        car_descriptor, head_descriptor = draw_circle(subplot, self.car_init_position, 3, self.car_init_degree)
+        return car_descriptor, head_descriptor
 
 
 class Car:
@@ -61,8 +62,11 @@ class Car:
 
         self.y = self.y + np.sin(degrees_to_radians(self.head_toward+turn_degree)) \
             - sin(degrees_to_radians(turn_degree)) * cos(degrees_to_radians(self.head_toward))
+        self.head_toward = self.head_toward - radians_to_degrees(arcsin(2 * sin(degrees_to_radians(turn_degree)) / 6))
 
-        self.head_toward = self.head_toward - arcsin(2 * sin(degrees_to_radians(turn_degree)) / 6)
+        # TODO: try different formula
+        # self.head_toward = radians_to_degrees(degrees_to_radians(self.head_toward)
+        #                                      - arcsin(2 * sin(degrees_to_radians(turn_degree)) / 6))
 
     def sensor(self, borders) -> list:
         # detect distance between car and wall
@@ -121,34 +125,47 @@ class Car:
 
     def detect_collision(self, border):
         for linear_function in border:
-            distance = abs(linear_function[0][0][0] * self.x + linear_function[0][0][1] * self.y - linear_function[1])\
-                       / np.sqrt(linear_function[0][0][0] ** 2 + linear_function[0][0][1] ** 2)
-            if distance < 3:
-                return True
+            if might_collision(self.x, self.y , linear_function[2], linear_function[3]):
+                distance = abs(linear_function[0][0][0] * self.x + linear_function[0][0][1] * self.y - linear_function[1])\
+                           / np.sqrt(linear_function[0][0][0] ** 2 + linear_function[0][0][1] ** 2)
+                if distance < 3:
+                    return True
 
-    def draw_car(self, car_descriptor):
-        move_circle(car_descriptor, (self.x, self.y), 3, self.head_toward)
+    def draw_car(self, car_descriptor, head_descriptor):
+        move_circle(car_descriptor, head_descriptor, (self.x, self.y), 3, self.head_toward)
 
     def arrive(self, top_left_coordinate, bottom_right_coordinate) -> bool:
         """check if the car arrive destination"""
-        # TODO: finish this function
+        return in_range((self.x, self.y), top_left_coordinate, bottom_right_coordinate)
+
+    def reset(self):
+        """after collision, reset car position"""
+        # TODO: change this to fit all map
+        self.x = 5 * random.random() - 2.5
+        self.y = 14 * random.random()
+        self.head_toward = 90
 
 
 def draw_circle(my_plot, center, radius, head_toward):
     angles_circle = [i*pi/180 for i in range(0, 360)]
     x = center[0] + radius*cos(angles_circle)
     y = center[1] + radius*sin(angles_circle)
-    obj_descriptor, = my_plot.plot(x, y, 'r-')
-    return obj_descriptor
+    circle_descriptor, = my_plot.plot(x, y, 'r-')
+    head_descriptor, = my_plot.plot((center[0], center[0] + radius * cos(degrees_to_radians(head_toward))),
+                                    (center[1], center[1] + radius * sin(degrees_to_radians(head_toward))),
+                                    color='blue')
+    return circle_descriptor, head_descriptor
 
 
-def move_circle(circle_descriptor, center, radius, head_toward):
-    # TODO: use another descriptor to draw head_toward
+def move_circle(circle_descriptor, head_descriptor, center, radius, head_toward):
     angles_circle = [i*pi/180 for i in range(0, 360)]
     x = center[0] + radius*cos(angles_circle)
     y = center[1] + radius*sin(angles_circle)
     circle_descriptor.set_xdata(x)
     circle_descriptor.set_ydata(y)
+
+    head_descriptor.set_xdata((center[0], center[0] + radius * cos(degrees_to_radians(head_toward))))
+    head_descriptor.set_ydata((center[1], center[1] + radius * sin(degrees_to_radians(head_toward))))
 
 
 def degrees_to_radians(degree):
@@ -165,6 +182,16 @@ def in_range(intersection, point1, point2):
     y_max = max(point1[1], point2[1])
     y_min = min(point1[1], point2[1])
     if x_min <= intersection[0] <= x_max and y_min <= intersection[1] <= y_max:
+        return True
+    else:
+        return False
+
+
+def might_collision(center_x, center_y, point1, point2):
+    """border is not a line but a line segment, so we need to check if collision might happen"""
+    x_max = max(point1[0], point2[0])
+    x_min = min(point1[0], point2[0])
+    if x_min <= center_x + 3 <= x_max or x_min <= center_x - 3 <= x_max:
         return True
     else:
         return False

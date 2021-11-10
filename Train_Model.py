@@ -10,9 +10,9 @@ def train_model(config: dict, dataset: Dataset, model: 'MLP'):
         np.random.shuffle(dataset.training_dataset)
         for training_data in dataset.training_dataset:
             # print(training_data)
-            my_model.forward(training_data)
-            my_model.backward()
-            my_model.update()
+            model.forward(training_data)
+            model.backward()
+            model.update()
             # test if model is better than before
             # if check_count == config['check_packet_frequency']:
             #     tmp_error = 0
@@ -33,12 +33,13 @@ def train_model(config: dict, dataset: Dataset, model: 'MLP'):
 
 if __name__ == '__main__':
     my_config = {
-        'epoch': 1000,
+        'epoch': 2000,
         'check_packet_frequency': 100
     }
-    my_dataset = Dataset.Dataset('./data/new_train_data.txt', True)
-    my_model = Model.MLP([(3, 10), (10, 5), (5, 1)], 0.05)
+    my_dataset = Dataset.Dataset('./data/train4dAll.txt', True, 'sigmoid')
+
+    my_model = Model.MLP([(3, 10), (10, 1)], 'sigmoid', 0.05)
     my_model = train_model(my_config, my_dataset, my_model)
 
     print(my_model.weight)
-    my_model.save_model()
+    my_model.save_model('sigmoid_model.txt')

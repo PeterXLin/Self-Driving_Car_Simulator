@@ -25,7 +25,7 @@ class Map:
                 point = line.split(',')
                 self.map_point.append((int(point[0]), int(point[1])))
 
-            # ax + by = k , store (a, b, k)
+            # ax + by = k , store [(a, b), k, point1, point2]
             self.border_linear_equations = list()
             for i in range(len(self.map_point) - 1):
                 a = self.map_point[i + 1][1] - self.map_point[i][1]
@@ -63,10 +63,6 @@ class Car:
         self.y = self.y + np.sin(degrees_to_radians(self.head_toward+turn_degree)) \
             - sin(degrees_to_radians(turn_degree)) * cos(degrees_to_radians(self.head_toward))
         self.head_toward = self.head_toward - radians_to_degrees(arcsin(2 * sin(degrees_to_radians(turn_degree)) / 6))
-
-        # TODO: try different formula
-        # self.head_toward = radians_to_degrees(degrees_to_radians(self.head_toward)
-        #                                      - arcsin(2 * sin(degrees_to_radians(turn_degree)) / 6))
 
     def sensor(self, borders) -> list:
         # detect distance between car and wall
@@ -125,11 +121,11 @@ class Car:
 
     def detect_collision(self, border):
         for linear_function in border:
-            if might_collision(self.x, self.y , linear_function[2], linear_function[3]):
-                distance = abs(linear_function[0][0][0] * self.x + linear_function[0][0][1] * self.y - linear_function[1])\
-                           / np.sqrt(linear_function[0][0][0] ** 2 + linear_function[0][0][1] ** 2)
-                if distance < 3:
-                    return True
+            point1 = linear_function[2]
+            point2 = linear_function[3]
+            distance = point_to_segment_distance(self.x, self.y, point1[0], point1[1], point2[0], point2[1])
+            if distance < 3:
+                return True
 
     def draw_car(self, car_descriptor, head_descriptor):
         move_circle(car_descriptor, head_descriptor, (self.x, self.y), 3, self.head_toward)
@@ -195,6 +191,23 @@ def might_collision(center_x, center_y, point1, point2):
         return True
     else:
         return False
+
+
+def point_to_segment_distance(x, y, x1, y1, x2, y2):
+    cross = (x2 - x1) * (x - x1) + (y2 - y1) * (y - y1)
+
+    if cross <= 0:
+        return np.sqrt((x - x1) ** 2 + (y - y1) ** 2)
+
+    d2 = (x2 - x1) ** 2 + (y2 - y1) ** 2
+
+    if cross >= d2:
+        return np.sqrt((x - x2) ** 2 + (y - y2) ** 2)
+
+    r = cross / d2
+    px = x1 + (x2 - x1) * r
+    py = y1 + (y2 - y1) * r
+    return np.sqrt((x - px) ** 2 + (y - py) ** 2)
 
 
 def same_sign(a, b):

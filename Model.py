@@ -1,9 +1,10 @@
 # this script of code implement MLP
 import numpy as np
 
+
 class MLP:
     """MLP model"""
-    def __init__(self, neuron_amount: list, lr: float = 0.1):
+    def __init__(self, neuron_amount: list, activation_function='sigmoid', lr: float = 0.05):
         """define the structure of model"""
         # modify here to change model structure(layer, neuron amount)
         self.neuron_amount = neuron_amount
@@ -15,7 +16,10 @@ class MLP:
         # [delta1, delta2,......]
         self.delta = set_delta(self.neuron_amount)
         self.label_buffer = 0
-        self.activation_function = ReLU
+        if activation_function == 'ReLU':
+            self.activation_function = ReLU
+        elif activation_function == 'sigmoid':
+            self.activation_function = sigmoid
         self.learning_rate = lr
 
     def forward(self, input_layer_input):
@@ -61,11 +65,15 @@ class MLP:
         for i in range(len(self.weight)):
             self.output_tmp[i + 1][0][1:] = self.activation_function(self.output_tmp[i].dot(self.weight[i].transpose()))
         # return output layer([[1]])
-        return self.output_tmp[len(self.weight)]
+        if self.activation_function == ReLU:
+            return self.output_tmp[-1][0][1] - 40
+        elif self.activation_function == sigmoid:
+            return (self.output_tmp[-1][0][1] * 80) - 40
 
-    def save_model(self):
+    def save_model(self, filename):
         """store model"""
-        with open("./data/model.txt", 'w') as fd:
+        with open('./data/' + filename, 'w') as fd:
+            # TODO: also save activation function
             for neuron_size in self.neuron_amount:
                 fd.write(str(neuron_size[0]) + ' ' + str(neuron_size[1]) + ' ')
             fd.write('\n')
@@ -132,14 +140,15 @@ def split_feature_and_label(features_and_label):
     return features_and_label[:-1].reshape(1, features_and_label.shape[0] - 1), features_and_label[-1:].reshape(1, 1)
 
 
-def load_model():
-    with open('./data/model.txt', 'r') as fp:
+def load_model(filename):
+    with open('./data/' + filename, 'r') as fp:
         model_layer_raw = fp.readline().split(' ')
         model_layer = list()
         # -1 to avoid '\n'
         for i in range(0, len(model_layer_raw) - 1, 2):
             model_layer.append((int(model_layer_raw[i]), int(model_layer_raw[i+1])))
-        my_model = MLP(model_layer, 0.01)
+        # todo: assign activation function
+        my_model = MLP(model_layer)
         # set weight
         for i in range(len(model_layer)):
             for j in range(model_layer[i][1]):

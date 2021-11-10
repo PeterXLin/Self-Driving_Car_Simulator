@@ -55,10 +55,14 @@ def self_drive():
     sensor_value = my_car.sensor(my_map.border_linear_equations)
     update_sensor_output(sensor_value)
     # load model
-    my_model = Model.load_model()
+    my_model = Model.load_model('sigmoid_model.txt')
     tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
     while True:
-        turn_degree = my_model.predict(tmp_input)[0][1]
+        turn_degree = my_model.predict(tmp_input)
+        if turn_degree < -40:
+            turn_degree = -40
+        elif turn_degree >= 10:
+            turn_degree = 40
         my_car.move(turn_degree)
         my_car.draw_car(car_descriptor, head_descriptor)
 

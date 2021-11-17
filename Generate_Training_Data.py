@@ -2,11 +2,15 @@ import tkinter as tk
 import Car_and_Map
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import numpy as np
+import Model
+import random
 
 sensor_log = list()
 last_time_right = '0'
 last_time_front = '0'
 last_time_left = '0'
+stop = False
 
 
 def move():
@@ -38,6 +42,137 @@ def move():
     car_canvas.draw()
 
 
+def self_drive():
+    """self drive based on the pre train MLP model"""
+    my_map, car_plot, car_descriptor, head_descriptor = load_map()
+    my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
+
+    sensor_value = my_car.sensor(my_map.border_linear_equations)
+    update_sensor_output(sensor_value)
+    # load model
+    my_model = Model.load_model('sigmoid_model_2.txt')
+    tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+
+    while True:
+        if stop:
+            break
+
+        # TODO here
+        turn_degree = my_model.predict(tmp_input) * (random.random() / 2 + 0.75)
+        if turn_degree < -40:
+            turn_degree = -40
+        elif turn_degree >= 40:
+            turn_degree = 40
+
+        this_time_turn = turn_degree
+        my_car.move(turn_degree)
+        my_car.draw_car(car_descriptor, head_descriptor)
+
+        if my_car.detect_collision(my_map.border_linear_equations):
+            # report collision and reset car position
+            # tell user click self drive button again to restart
+            sensor_log.clear()
+            my_car.reset()
+            my_car.draw_car(car_descriptor, head_descriptor)
+            sensor_value = my_car.sensor(my_map.border_linear_equations)
+            # for next turn input
+            tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+            update_sensor_output(sensor_value)
+
+            set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+            continue
+        if my_car.arrive(my_map.dest_up_left, my_map.dest_botton_right):
+            # show congratulation message
+            save()
+            my_car.reset()
+            my_car.draw_car(car_descriptor, head_descriptor)
+            sensor_value = my_car.sensor(my_map.border_linear_equations)
+            update_sensor_output(sensor_value)
+            tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+            set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+            sensor_log.clear()
+
+            continue
+
+        sensor_value = my_car.sensor(my_map.border_linear_equations)
+        tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+        update_sensor_output(sensor_value)
+        sensor_log.append(last_time_front + ' ' + last_time_right + ' ' + last_time_left + ' ' + str(this_time_turn))
+        set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+        car_canvas.draw()
+
+
+def self_drive_by_rule():
+    """self drive based on the pre train MLP model"""
+    my_map, car_plot, car_descriptor, head_descriptor = load_map()
+    my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
+
+    sensor_value = my_car.sensor(my_map.border_linear_equations)
+    update_sensor_output(sensor_value)
+    # load model
+    tmp_input = np.array([sensor_value[1], sensor_value[2], sensor_value[0]])
+
+    while True:
+        if stop:
+            break
+
+        # TODO here
+        if tmp_input[1] < 6:
+            turn_degree = random.random() * -20
+        elif tmp_input[2] < 6:
+            turn_degree = random.random() * 20
+        elif tmp_input[0] >= 15:
+            turn_degree = random.random()*10 - 5
+        else:
+            turn_degree = random.random()*(tmp_input[1] - tmp_input[2])*2.5
+        if turn_degree < -40:
+            turn_degree = -40
+        elif turn_degree >= 10:
+            turn_degree = 40
+
+        this_time_turn = turn_degree
+        my_car.move(turn_degree)
+        my_car.draw_car(car_descriptor, head_descriptor)
+
+        if my_car.detect_collision(my_map.border_linear_equations):
+            # report collision and reset car position
+            # tell user click self drive button again to restart
+            sensor_log.clear()
+            my_car.reset()
+            my_car.draw_car(car_descriptor, head_descriptor)
+            sensor_value = my_car.sensor(my_map.border_linear_equations)
+            # for next turn input
+            tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+            update_sensor_output(sensor_value)
+
+            set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+            continue
+        if my_car.arrive(my_map.dest_up_left, my_map.dest_botton_right):
+            # show congratulation message
+            save()
+            my_car.reset()
+            my_car.draw_car(car_descriptor, head_descriptor)
+            sensor_value = my_car.sensor(my_map.border_linear_equations)
+            update_sensor_output(sensor_value)
+            tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+            set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+            sensor_log.clear()
+
+            continue
+
+        sensor_value = my_car.sensor(my_map.border_linear_equations)
+        tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+        update_sensor_output(sensor_value)
+        sensor_log.append(last_time_front + ' ' + last_time_right + ' ' + last_time_left + ' ' + str(this_time_turn))
+        set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+        car_canvas.draw()
+
+
+def break_run():
+    global stop
+    stop = True
+
+
 def set_sensor_log(left_value, front_value, right_value):
     global last_time_left, last_time_front, last_time_right
     last_time_left = str(round(left_value, 4))
@@ -61,7 +196,7 @@ def load_map():
 
 
 def save():
-    with open('./data/new_train_data.txt', 'a') as fp:
+    with open('./data/drive_by_rule.txt', 'a') as fp:
         for line in sensor_log:
             fp.write(line + '\n')
 
@@ -83,9 +218,9 @@ right_part.place(x=750, y=0)
 
 left_sensor_label = tk.Label(right_part, text='0')
 left_sensor_label.pack()
-front_sensor_label = tk.Label(right_part, text = '0')
+front_sensor_label = tk.Label(right_part, text='0')
 front_sensor_label.pack()
-right_sensor_label = tk.Label(right_part, text = '0')
+right_sensor_label = tk.Label(right_part, text='0')
 right_sensor_label.pack()
 
 turn_label = tk.Label(right_part, text='Turn Degree')
@@ -94,10 +229,10 @@ turn_label.pack()
 turn_degree_entry = tk.Entry(right_part)
 turn_degree_entry.pack()
 
-run_btn = tk.Button(right_part, text='move', command=move)
+run_btn = tk.Button(right_part, text='self drive', command=self_drive_by_rule)
 run_btn.pack()
 
-save_btn = tk.Button(right_part, text='save', command=save)
+save_btn = tk.Button(right_part, text='break', command=break_run)
 save_btn.pack()
 
 

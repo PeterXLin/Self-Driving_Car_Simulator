@@ -6,18 +6,25 @@ from tkinter import Tk, Canvas, Button, PhotoImage
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import Car_and_Map
-import time
 import Model
 import numpy as np
-# import matplotlib.pyplot as plt
-# import matplotlib.animation as animation
-# import numpy as np
+from tkinter import filedialog as fd
 
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path("./assets")
 
 # --------------global variable--------------
+my_config = {
+    'map_path': '',
+    'log_path': ''
+}
+
+left_sensor = ''
+right_sensor = ''
+front_sensor = ''
 # ----------------- backend ------------------------------
+# TODO: 讀取行進路徑記錄檔(6d)讓自走車根據紀錄檔中的路徑行走碰撞偵測，自走車碰到軌道及終點須能自動停止
+# TODO: 作業繳交移動紀錄
 
 
 def relative_to_assets(path: str) -> Path:
@@ -25,66 +32,109 @@ def relative_to_assets(path: str) -> Path:
 
 
 def load_map():
+    """draw map and car in figure"""
     car_figure.clear()
     car_plot = car_figure.add_subplot(111)
-    # TODO: read map
-    my_map = Car_and_Map.Map('./data/軌道座標點.txt')
+    my_map = Car_and_Map.Map(my_config['map_path'])
     car_descriptor, head_descriptor = my_map.draw_map_and_car_start(car_plot)
     car_canvas.draw()
     return my_map, car_plot, car_descriptor, head_descriptor
 
 
 def load_record():
-    """load log and plot in figure"""
-    # TODO: finish this function
+    """load log(4d) and plot in figure"""
     my_map, car_plot, car_descriptor, head_descriptor = load_map()
     my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
-    for i in range(10):
-        my_car.move(0)
-        my_car.draw_car(car_descriptor, head_descriptor)
-        sensor_value = my_car.sensor(my_map.border_linear_equations)
-        update_sensor_output(sensor_value)
-        car_canvas.draw()
-        time.sleep(0.5)
+
+    with open(my_config['log_path'], 'r') as fp:
+        for records in fp.readlines():
+            sensor_value = my_car.sensor(my_map.border_linear_equations)
+            update_sensor_output(sensor_value)
+            turn_degree = records.split(' ')[3]
+            my_car.move(turn_degree)
+            my_car.draw_car(car_descriptor, head_descriptor)
+            car_canvas.draw()
+
+            if my_car.detect_collision(my_map.border_linear_equations) or \
+                    my_car.arrive(my_map.dest_up_left, my_map.dest_botton_right):
+                break
 
 
 def self_drive():
     """self drive based on the pre train MLP model"""
     my_map, car_plot, car_descriptor, head_descriptor = load_map()
     my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
+
     sensor_value = my_car.sensor(my_map.border_linear_equations)
     update_sensor_output(sensor_value)
-    # load model
-    my_model = Model.load_model('sigmoid_model.txt')
+    # tmp_input is the input of model, used to predict the angle of steering wheels
     tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+    # load model
+    my_model = Model.load_model('sigmoid_model_1_data_from_rule.txt')
+
     while True:
-        turn_degree = my_model.predict(tmp_input)
-        if turn_degree < -40:
-            turn_degree = -40
-        elif turn_degree >= 10:
-            turn_degree = 40
+        turn_degree = Car_and_Map.valid_steering_wheel_angle(my_model.predict(tmp_input))
+        set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+        save_log(front_sensor + ' ' + right_sensor + ' ' + left_sensor + ' ' + str(turn_degree), 'log_4d.txt')
+        save_log(str(my_car.x) + ' ' + str(my_car.y) + ' ' + front_sensor + ' ' + right_sensor + ' ' + left_sensor + ' '
+                 + str(turn_degree), 'log_6d.txt')
+
         my_car.move(turn_degree)
         my_car.draw_car(car_descriptor, head_descriptor)
+        car_canvas.draw()
 
         if my_car.detect_collision(my_map.border_linear_equations):
-            # report collision and reset car position
-            # tell user click self drive button again to restart
-            break
+            # if car accident happened, reset car position and restart
+            my_car.reset()
+            sensor_value = my_car.sensor(my_map.border_linear_equations)
+            update_sensor_output(sensor_value)
+            tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
+            continue
         if my_car.arrive(my_map.dest_up_left, my_map.dest_botton_right):
-            # show congratulation message
             break
 
+        # for next move
         sensor_value = my_car.sensor(my_map.border_linear_equations)
         tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
         update_sensor_output(sensor_value)
-        car_canvas.draw()
+
+
+def set_sensor_log(left_value, front_value, right_value):
+    global left_sensor, right_sensor, front_sensor
+    left_sensor = str(round(left_value, 4))
+    front_sensor = str(round(front_value, 4))
+    right_sensor = str(round(right_value, 4))
+
+
+def save_log(log, file_name):
+    with open('./data/' + file_name, 'a') as fp:
+        fp.write(log + '\n')
 
 
 def update_sensor_output(new_value: list):
-    """update sensor value"""
+    """update sensor label"""
     canvas.itemconfig(left_sensor_value_entry, text=round(new_value[0], 2))
     canvas.itemconfig(front_sensor_value_entry, text=round(new_value[1], 2))
     canvas.itemconfig(right_sensor_value_entry, text=round(new_value[2], 2))
+
+
+def select_map():
+    my_config['map_path'] = select_file()
+
+
+def select_log():
+    my_config['log_path'] = select_file()
+
+
+def select_file():
+    filetypes = (
+        ('text files', '*.txt'),
+    )
+    file_path = fd.askopenfilename(
+        title='Open a file',
+        initialdir='./data',
+        filetypes=filetypes)
+    return file_path
 
 
 # ---------------------------------------------------------
@@ -215,24 +265,6 @@ left_sensor_value_entry = canvas.create_text(
     font=("SuezOne Regular", 24 * -1)
 )
 
-canvas.create_text(
-    63.0,
-    86.0,
-    anchor="nw",
-    text="Map Name",
-    fill="#FFFFFF",
-    font=("SeoulHangangEB", 24 * -1)
-)
-
-canvas.create_text(
-    66.0,
-    200.0,
-    anchor="nw",
-    text="Log Name",
-    fill="#FFFFFF",
-    font=("SeoulHangangEB", 24 * -1)
-)
-
 button_image_3 = PhotoImage(
     file=relative_to_assets("button_3.png"))
 button_3 = Button(
@@ -255,7 +287,7 @@ button_4 = Button(
     image=button_image_4,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("button_4 clicked"),
+    command=select_map,
     relief="flat"
 )
 button_4.place(

@@ -1,8 +1,5 @@
 import numpy as np
 
-# TODO: sigmoid 輸出只有0-1
-# TODO: relu 無法出現負數
-
 
 class Dataset:
     def __init__(self, path, all_train: float = False, activation_function="ReLU"):
@@ -11,9 +8,11 @@ class Dataset:
 
         if activation_function == 'ReLU':
             for i in range(raw_data.shape[0]):
+                # ReLU can't output negative number
                 raw_data[i][-1] = raw_data[i][-1] + 40
         elif activation_function == 'sigmoid':
             for i in range(raw_data.shape[0]):
+                # sigmoid output between 0 and 1
                 raw_data[i][-1] = (raw_data[i][-1] + 40) / 80
 
         np.random.shuffle(raw_data)

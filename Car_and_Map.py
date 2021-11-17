@@ -219,6 +219,16 @@ def same_sign(a, b):
         return False
 
 
+def valid_steering_wheel_angle(angle):
+    if angle < -40:
+        return -40
+    elif angle > 40:
+        return 40
+    else:
+        tmp = float(angle)
+        return tmp
+
+
 if __name__ == "__main__":
     # Map('./data/軌道座標點.txt')
     # print(degrees_to_radians(90))

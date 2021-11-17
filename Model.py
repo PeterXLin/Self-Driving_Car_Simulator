@@ -73,10 +73,19 @@ class MLP:
     def save_model(self, filename):
         """store model"""
         with open('./data/' + filename, 'w') as fd:
-            # TODO: also save activation function
+            # record activation function
+            if self.activation_function == ReLU:
+                fd.write('ReLU' + ' ')
+            elif self.activation_function == sigmoid:
+                fd.write('sigmoid' + ' ')
+            fd.write('\n')
+
+            # record model size
             for neuron_size in self.neuron_amount:
                 fd.write(str(neuron_size[0]) + ' ' + str(neuron_size[1]) + ' ')
             fd.write('\n')
+
+            # record weight
             for neuron_weight in self.weight:
                 for row in neuron_weight:
                     for column in row:
@@ -118,7 +127,6 @@ def set_delta(each_layer_neuron):
     delta = list()
     for input_d, output_d in each_layer_neuron:
         # no delta for bias
-        # todo: 好像不用給形狀，會直接取代
         this_layer_delta = np.zeros((1, output_d))
         delta.append(this_layer_delta)
     return delta
@@ -141,19 +149,20 @@ def split_feature_and_label(features_and_label):
 
 
 def load_model(filename):
-    with open('./data/' + filename, 'r') as fp:
+    with open('./model/' + filename, 'r') as fp:
+        model_activation_function = fp.readline().split(' ')[0]
         model_layer_raw = fp.readline().split(' ')
         model_layer = list()
         # -1 to avoid '\n'
         for i in range(0, len(model_layer_raw) - 1, 2):
             model_layer.append((int(model_layer_raw[i]), int(model_layer_raw[i+1])))
-        # todo: assign activation function
-        my_model = MLP(model_layer)
+
+        my_model = MLP(model_layer, model_activation_function)
         # set weight
         for i in range(len(model_layer)):
             for j in range(model_layer[i][1]):
                 tmp = fp.readline().split(' ')
-                # TODO: -1
+                # len(tmp) include '\n\, so len - 1
                 for k in range(len(tmp) - 1):
                     my_model.weight[i][j][k] = tmp[k]
     return my_model

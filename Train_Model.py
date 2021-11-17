@@ -33,13 +33,14 @@ def train_model(config: dict, dataset: Dataset, model: 'MLP'):
 
 if __name__ == '__main__':
     my_config = {
-        'epoch': 2000,
+        'epoch': 500,
         'check_packet_frequency': 100
     }
-    my_dataset = Dataset.Dataset('./data/train4dAll.txt', True, 'sigmoid')
+    my_dataset = Dataset.Dataset('./data/drive_by_rule.txt', True, 'sigmoid')
 
-    my_model = Model.MLP([(3, 10), (10, 1)], 'sigmoid', 0.05)
+    my_model = Model.MLP([(3, 10), (10, 5), (5, 1)], 'sigmoid', 0.05)
+    # my_model = Model.load_model('sigmoid_model_2.txt')
     my_model = train_model(my_config, my_dataset, my_model)
 
     print(my_model.weight)
-    my_model.save_model('sigmoid_model.txt')
+    my_model.save_model('sigmoid_model_1_data_from_rule.txt')

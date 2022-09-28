@@ -10,9 +10,6 @@ import Model
 import numpy as np
 from tkinter import filedialog as fd
 
-OUTPUT_PATH = Path(__file__).parent
-ASSETS_PATH = OUTPUT_PATH / Path("./assets")
-
 # --------------global variable--------------
 my_config = {
     'map_path': '',
@@ -23,12 +20,6 @@ left_sensor = ''
 right_sensor = ''
 front_sensor = ''
 # ----------------- backend ------------------------------
-# TODO: 讀取行進路徑記錄檔(6d)讓自走車根據紀錄檔中的路徑行走碰撞偵測，自走車碰到軌道及終點須能自動停止
-# TODO: 作業繳交移動紀錄
-
-
-def relative_to_assets(path: str) -> Path:
-    return ASSETS_PATH / Path(path)
 
 
 def load_map():
@@ -42,16 +33,49 @@ def load_map():
 
 
 def load_record():
+    """load log, include 4d and 6d"""
+    with open(my_config['log_path'], 'r') as fp:
+        first_line = fp.readline()
+        dim = len(first_line.split(' '))
+    if dim == 4:
+        load_4d_record()
+    elif dim == 6:
+        load_6d_record()
+
+
+def load_6d_record():
+    """load log(6d) and show in figure"""
+    my_map, car_plot, car_descriptor, head_descriptor = load_map()
+    my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
+
+    with open(my_config['log_path'], 'r') as fp:
+        for records in fp.readlines():
+            tmp_list = records.split(' ')
+            update_sensor_output([float(tmp_list[4]), float(tmp_list[2]), float(tmp_list[3])])
+            my_car.move(float(tmp_list[5]))
+            my_car.x = float(tmp_list[0])
+            my_car.y = float(tmp_list[1])
+            my_car.draw_car(car_descriptor, head_descriptor)
+            car_canvas.draw()
+
+            if my_car.detect_collision(my_map.border_linear_equations) or \
+                    my_car.arrive(my_map.dest_up_left, my_map.dest_botton_right):
+                break
+
+
+def load_4d_record():
     """load log(4d) and plot in figure"""
     my_map, car_plot, car_descriptor, head_descriptor = load_map()
     my_car = Car_and_Map.Car(my_map.car_init_position, my_map.car_init_degree)
 
     with open(my_config['log_path'], 'r') as fp:
         for records in fp.readlines():
-            sensor_value = my_car.sensor(my_map.border_linear_equations)
-            update_sensor_output(sensor_value)
-            turn_degree = records.split(' ')[3]
-            my_car.move(turn_degree)
+            tmp_list = records.split(' ')
+            # sensor_value = my_car.sensor(my_map.border_linear_equations)
+            # use  log to set sensor_value
+            update_sensor_output([float(tmp_list[2]), float(tmp_list[0]), float(tmp_list[1])])
+            # turn_degree = records.split(' ')[3]
+            my_car.move(float(tmp_list[3]))
             my_car.draw_car(car_descriptor, head_descriptor)
             car_canvas.draw()
 
@@ -70,14 +94,14 @@ def self_drive():
     # tmp_input is the input of model, used to predict the angle of steering wheels
     tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
     # load model
-    my_model = Model.load_model('sigmoid_model_1_data_from_rule.txt')
+    my_model = Model.load_model('sigmoid_model_3_data_from_me.txt')
 
     while True:
         turn_degree = Car_and_Map.valid_steering_wheel_angle(my_model.predict(tmp_input))
         set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
-        save_log(front_sensor + ' ' + right_sensor + ' ' + left_sensor + ' ' + str(turn_degree), 'log_4d.txt')
+        save_log(front_sensor + ' ' + right_sensor + ' ' + left_sensor + ' ' + str(turn_degree), 'train4D.txt')
         save_log(str(my_car.x) + ' ' + str(my_car.y) + ' ' + front_sensor + ' ' + right_sensor + ' ' + left_sensor + ' '
-                 + str(turn_degree), 'log_6d.txt')
+                 + str(turn_degree), 'train6D.txt')
 
         my_car.move(turn_degree)
         my_car.draw_car(car_descriptor, head_descriptor)
@@ -91,6 +115,12 @@ def self_drive():
             tmp_input = np.array(([sensor_value[1], sensor_value[2], sensor_value[0]]))
             continue
         if my_car.arrive(my_map.dest_up_left, my_map.dest_botton_right):
+            # 加入到達終點的這一次的車子座標點
+            set_sensor_log(sensor_value[0], sensor_value[1], sensor_value[2])
+            save_log(front_sensor + ' ' + right_sensor + ' ' + left_sensor + ' ' + str(turn_degree), 'train4D.txt')
+            save_log(
+                str(my_car.x) + ' ' + str(my_car.y) + ' ' + front_sensor + ' ' + right_sensor + ' ' + left_sensor + ' '
+                + str(turn_degree), 'train6D.txt')
             break
 
         # for next move
@@ -180,7 +210,7 @@ canvas.create_rectangle(
     outline="")
 
 button_image_1 = PhotoImage(
-    file=relative_to_assets("button_1.png"))
+    file="assets/button_1.png")
 button_1 = Button(
     image=button_image_1,
     borderwidth=0,
@@ -196,7 +226,7 @@ button_1.place(
 )
 
 button_image_2 = PhotoImage(
-    file=relative_to_assets("button_2.png"))
+    file="assets/button_2.png")
 button_2 = Button(
     image=button_image_2,
     borderwidth=0,
@@ -266,12 +296,12 @@ left_sensor_value_entry = canvas.create_text(
 )
 
 button_image_3 = PhotoImage(
-    file=relative_to_assets("button_3.png"))
+    file="assets/button_3.png")
 button_3 = Button(
     image=button_image_3,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("button_3 clicked"),
+    command=select_log,
     relief="flat"
 )
 button_3.place(
@@ -282,7 +312,7 @@ button_3.place(
 )
 
 button_image_4 = PhotoImage(
-    file=relative_to_assets("button_4.png"))
+    file="assets/button_4.png")
 button_4 = Button(
     image=button_image_4,
     borderwidth=0,
